@@ -1,7 +1,8 @@
 # accounts/views.py
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, response, status
 from django.contrib.auth import get_user_model
-from .serializers import RegisterSerializer, UserSerializer
+from rest_framework.authtoken.models import Token
+from .serializers import RegisterSerializer, LoginSerializer
 
 User = get_user_model()
 
@@ -9,8 +10,27 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = (permissions.AllowAny,)
     serializer_class = RegisterSerializer
 
-class MeView(generics.RetrieveUpdateAPIView):
-    serializer_class = UserSerializer
+    def create(self, request, *args, **kwargs):
+        super_response = super().create(request, *args, **kwargs)
+        user = self.get_serializer().instance
+        token = Token.objects.get(user=user)
+        data = {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "token": token.key, 
+        }
+        return response.Response(data, status=status.HTTP_201_CREATED)
 
-    def get_object(self):
-        return self.request.user
+
+class LoginView(generics.CreateAPIView):
+    permission_classes = (permissions.AllowAny,)
+    serializer_class = LoginSerializer
+
+    def create(self, request, *args, **kwargs):
+        ser = self.get_serializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        data = ser.save()
+        return response.Response(data, status=status.HTTP_200_OK)
+
+
